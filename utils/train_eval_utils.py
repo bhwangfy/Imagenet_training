@@ -18,7 +18,7 @@ def torch_seed(seed=0):
     torch.cuda.manual_seed_all(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-def adjust_learning_rate(optimizer, warm_up, epoch, epochs, base_lr, step, iteration_per_epoch):  
+def adjust_learning_rate_cosine(optimizer, warm_up, epoch, epochs, base_lr, step, iteration_per_epoch):  
     '''  
     warm_up: number of steps  
     '''  
@@ -36,6 +36,20 @@ def adjust_learning_rate(optimizer, warm_up, epoch, epochs, base_lr, step, itera
     for param_group in optimizer.param_groups:  
         param_group['lr'] = lr  
 
+def adjust_learning_rate_resnet(optimizer, epoch, base_lr):  
+    """  
+    Adjusts learning rate according to the ResNet paper.  
+    """  
+  
+    if epoch < 30:  
+        lr = base_lr  
+    elif epoch < 60:  
+        lr = base_lr / 10  
+    else:  
+        lr = base_lr / 100  
+  
+    for param_group in optimizer.param_groups:  
+        param_group['lr'] = lr 
     
     
 def train_one_epoch(model, optimizer, data_loader,loss_function, device, epoch, epochs, warm_up, base_lr):
@@ -51,7 +65,7 @@ def train_one_epoch(model, optimizer, data_loader,loss_function, device, epoch, 
     for step, (images, labels) in enumerate(data_loader):
         
         if is_main_process():
-            adjust_learning_rate(optimizer, warm_up, epoch, epochs, base_lr, step, len(data_loader))
+            adjust_learning_rate_resnet(optimizer, warm_up, epoch, epochs, base_lr, step, len(data_loader))
             epoch_lr.append(optimizer.param_groups[0]['lr'])
         
         images, labels = images.to(device), labels.to(device)
