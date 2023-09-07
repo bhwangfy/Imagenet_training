@@ -1,0 +1,121 @@
+description: telescope
+
+# target:
+#   service: amlk8s
+#   # name: ms-shared
+#   name:  itplabrr1cl1
+#   vc: resrchvc
+
+target:
+  service: sing
+  name: msroctovc # 64 v100 quto, fewer preemptions
+  workspace_name: msroctows
+
+# target:
+#   service: amlk8s
+#   name: itplabrr1cl1 # 64 v100 quto, fewer preemptions
+#   vc: resrchvc
+
+environment:
+  image: jiyan/jymmm:20211229
+
+  registry: itpeus4cr.azurecr.io
+
+  username: itpeus4cr
+  setup:
+     - export MKL_THREADING_LAYER=GNU 
+     - pip install pandas pyyaml scipy
+     - pip install einops 
+     - pip install tqdm
+     - pip install torchsummary
+     - pip install --upgrade torch torchvision -f https://download.pytorch.org/whl/cu111/torch_stable.html 
+
+storage:
+  output:
+    storage_account_name: msramllts1
+    container_name: bohan
+    mount_dir: /blob
+    is_output: True
+    
+code:
+  # local directory of the code. this will be uploaded to the server.
+  # $CONFIG_DIR is expanded to the directory of this config file
+  local_dir: .
+
+
+search:
+  job_template:
+    name: sweep
+    sku: G8-A100-V100-P100
+    command:
+    # - python -m src.grid_lang_mlp_mixer.py --base-shapes-file-prefix base_shapes_lang_mlp --save-path './tmp_lang' --nsteps 20000 --depths '8' --depth-mult-pow2 0.5  --final-norm
+    - python -m torch.distributed.run --nproc_per_node=8 trainer.py --save-dir '/blob/ImageNet_Experiment/model'
+     --optimizer {opt}
+     --dataset {dataset_name}
+     --batch-size 128
+     --weight-decay {wdi}
+     --learning-rate {lr_scale}
+     --seed 1
+     --arch resnet50
+    # _width_{width}
+  type: grid
+  max_trials: 1000
+  params:
+    - name: lr_scale
+      spec: discrete
+      values: "[3e-4]"
+      # values: "2.**np.arange(-11, -6, 1)"
+      # values: "2.**np.arange(-5, -1, 1)"
+      # values: "2.**np.arange(-4, 0, 2)"
+    - name: opt
+      spec: discrete
+      # values: "[0.01,0.05,0.1,0.25,0.5,1.0]"
+      # values: "['AdamW','NormAdamW','SGD','NormSGD','Lion','NormLion','ClipAdamW']"
+      # values: "['NormAdamW','NormSGD','NormLion','ClipAdamW']"
+      # values: "['AdamW','Lion']"
+      # values: "['AdamW']"
+      values: "['lion']"
+      # values: "['SGD']"
+      # values: "['NormAdamW','NormSGD','NormLion','LayerWiseNormSGD','LayerWiseNormAdamW']"
+      # values: "['AdamW','NormAdamW']"
+      # values: "[0.5,2]"
+    - name: dataset_name
+      spec: discrete
+      values: "['imagenet']"
+    - name: wdi
+      spec: discrete
+      values: "[1]"
+
+  # max_trials: 105
+  # params:
+  #   - name: lr_scale
+  #     spec: discrete
+  #     # values: "2.**np.arange(-15, -5, 1)"
+  #     values: "2.**np.arange(-4, 5, 1)"
+  #     # values: "2.**np.arange(-1, 0, 2)"
+  #   - name: opt
+  #     spec: discrete
+  #     # values: "[0.01,0.05,0.1,0.25,0.5,1.0]"
+  #     # values: "['AdamW','NormAdamW','SGD','NormSGD','Lion','NormLion','ClipAdamW']"
+  #     # values: "['NormAdamW','NormSGD','NormLion','ClipAdamW']"
+  #     values: "['AdamW','Lion']"
+  #     # values: "['AdamW','NormAdamW']"
+  #     # values: "[0.5,2]"
+  #   - name: blocks
+  #     spec: discrete
+  #     # val
+  #     # values: "2.**np.arange(1, 6, 2)"
+  #     values: "['64']"
+  #     # values: "['256']"
+  #     # values: "['1024']"
+  #     # values: "['8,128']"
+  #     # values: "[','.join(str(n) for n in 2**np.arange(0, 11, 1))]"
+  #   - name: width
+  #     spec: discrete
+  #     # values: "2.**np.arange(1, 8, 2)"
+  #     # values: "2.**np.arange(1, 6, 2)"
+  #     values: "['4','8','32','64']"
+  #     # values: "['256']"
+  #     # values: "['1024']"
+  #     # values: "['8,128']"
+  #     # values: "[','.join(str(n) for n in 2**np.arange(0, 11, 1))]"
